@@ -1,0 +1,24 @@
+{
+  "name": "lock-indashboard",
+  "version": "1.0.0",
+  "description": "A React and Powershell application that removes distractions and tracks progress on Windows devices.",
+  "main": "index.js",
+  "scripts": {
+    "start": "npx @tailwindcss/cli -i ./src/input.css -o ./src/output.css --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NourSaifYassine/Lock-InDashboard.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/NourSaifYassine/Lock-InDashboard/issues"
+  },
+  "homepage": "https://github.com/NourSaifYassine/Lock-InDashboard#readme",
+  "dependencies": {
+    "@tailwindcss/cli": "^4.0.14",
+    "tailwindcss": "^4.0.14"
+  }
+}

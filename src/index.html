@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="./output.css">
+</head>
+
+<body class="bg-amber-700">
+    <nav class="text-white p-10 border-b-2 border-solid flex justify-between bg-amber-600 border-white">
+        <h1 class="text-2xl">Lock-InDashboard</h1>
+        <ul class="flex gap-4">
+            <li><a href="./instructions.html" class="text-xl">Guide</a></li>
+            <li><a href="./about.html" class="text-xl">About</a></li>
+            <li><a href="https://www.linkedin.com/in/nour-yassine-38942933a/" class="text-xl">Let's Connect</a></li>
+        </ul>
+    </nav>
+    <main class="py-10 px-10 flex flex-col justify-center">
+        <h1 class="text-3xl text-white pb-20" id="greetings"></h1>
+        <div class="flex justify-around items-center">
+            <div class="flex flex-col items-center gap-4">
+                <h3 class="text-xl text-white">List of processes</h3>
+                <ul id="listProcesses" class="overflow-y-scroll h-[50vh]">
+
+                </ul>
+            </div>
+            <div class="flex flex-col items-center gap-4">
+                <form id="stopProcessForm" class="flex flex-col gap-4">
+                    <label for="stopProcessInput" class="text-blue-600">Stop a process</label>
+                    <input type="text" class="text-blue-600 border-solid border-blue-900 border-4 rounded-2xl p-5" name="stopProcessInput" id="stopProcessInput">
+                    <button type="submit" class="bg-blue-600 text-white p-2 rounded-md">Stop Process</button>
+                </form>
+                <form id="addProcessForm" class="flex flex-col gap-4">
+                    <label for="addProcessInput" class="text-blue-600">Start a process</label>
+                    <input type="text" class="text-blue-600 border-solid border-blue-900 border-4 rounded-2xl p-5" name="addProcessInput" id="addProcessInput">
+                    <button type="submit" class="bg-blue-600 text-white p-2 rounded-md">Add Process</button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script src="./script.js"></script>
+</body>
+
+</html>
