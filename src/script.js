@@ -57,8 +57,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 body: JSON.stringify({ Name: input })
             });
             
-            const result = await response.json();
-            
             getProcesses();
         } catch (error) {
             console.error(`Error ${action}ing process:`, error);
