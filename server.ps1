@@ -1,12 +1,19 @@
+# Process Management HTTP Server
+# Global variables
 $jsonFile = "./data.json"
 $staticFilesDir = "./src/"
 
-# Define MIME types for different file extensions
+# Initialize tracking variables
+$script:serverStartTime = Get-Date
+$script:requestCount = 0
+$script:shuttingDown = $false
+
+# MIME type definitions for static file serving
 $mimeTypes = @{
     ".html" = "text/html"
     ".css"  = "text/css"
     ".js"   = "text/javascript"
-    ".json" = "application/json"
+    ".json" = "application/json" 
     ".png"  = "image/png"
     ".jpg"  = "image/jpeg"
     ".gif"  = "image/gif"
@@ -46,7 +53,6 @@ function Set-Json {
     }
 }
 
-# Fixed Send-StaticFile function
 function Send-StaticFile {
     param (
         [string]$LocalPath,
@@ -66,29 +72,26 @@ function Send-StaticFile {
     
     Write-Host "Attempting to serve file: $filePath"
     
-    # Check if the file exists
     if (Test-Path -Path $filePath -PathType Leaf) {
-        # Get the file extension and set the content type
         $extension = [System.IO.Path]::GetExtension($filePath).ToLower()
         $contentType = $mimeTypes[$extension]
         if (-not $contentType) {
             $contentType = "application/octet-stream"
         }
         
-        # Set the content type
         $Response.ContentType = $contentType
         
-        # Read the file content
         $fileContent = [System.IO.File]::ReadAllBytes($filePath)
         
-        # Send the file content
         $Response.ContentLength64 = $fileContent.Length
         $Response.OutputStream.Write($fileContent, 0, $fileContent.Length)
+        
+        # Track request
+        $script:requestCount++
         
         return $true
     }
     else {
-        # File not found
         Write-Host "File not found: $filePath" -ForegroundColor Yellow
         $Response.StatusCode = 404
         $Response.ContentType = "text/plain"
@@ -97,18 +100,26 @@ function Send-StaticFile {
         $Response.ContentLength64 = $errorBytes.Length
         $Response.OutputStream.Write($errorBytes, 0, $errorBytes.Length)
         
+        # Still track the request even though it's a 404
+        $script:requestCount++
+        
         return $false
     }
 }
 
 function Start-Server {
-    # Create data.json if it doesn't exist
+    # Reset tracking variables
+    $script:serverStartTime = Get-Date
+    $script:requestCount = 0
+    $script:shuttingDown = $false
+    
+    # Create data file if needed
     if (-not (Test-Path -Path $jsonFile)) {
         Write-Host "Creating empty data file: $jsonFile"
         "[]" | Out-File -FilePath $jsonFile -Force
     }
     
-    # Create src directory if it doesn't exist
+    # Create static files directory if needed
     if (-not (Test-Path -Path $staticFilesDir)) {
         Write-Host "Creating static files directory: $staticFilesDir"
         New-Item -ItemType Directory -Path $staticFilesDir -Force
@@ -147,15 +158,54 @@ function Start-Server {
             }
             
             Write-Host "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - $($request.HttpMethod) $($url.LocalPath)" -ForegroundColor Cyan
+            
+            # Track the API request
+            $script:requestCount++
 
             # Handle based on path
             try {
                 switch -Regex ($url.LocalPath) {
                     "/api/name" {
                         $response.ContentType = "application/json"
-                        # FIX: Wrap username in JSON format
-                        $username = (Get-CimInstance -ClassName Win32_ComputerSystem).UserName
-                        $responseBody = "{`"username`": `"$username`"}"
+                        try {
+                            $fullUsername = (Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop).UserName
+                            # Extract just the username part after the domain\
+                            $username = $fullUsername -replace '.*\\', ''
+                        } catch {
+                            $username = "Unknown User"
+                            Write-Error "Failed to retrieve username: $_"
+                        }
+                        # Use "name" instead of "username" to match client expectations
+                        $responseBody = "{`"name`": `"$username`"}"
+                        $buffer = [System.Text.Encoding]::UTF8.GetBytes($responseBody)
+                        $response.ContentLength64 = $buffer.Length
+                        $response.OutputStream.Write($buffer, 0, $buffer.Length)
+                        break
+                    }
+                    "/api/status" {
+                        $response.ContentType = "application/json"
+                        try {
+                            # Get basic system info
+                            $computerInfo = Get-CimInstance -ClassName Win32_OperatingSystem
+                            $uptime = (Get-Date) - $computerInfo.LastBootUpTime
+                            
+                            # Format server status information
+                            $statusInfo = @{
+                                serverRunning = $true
+                                serverStartTime = $script:serverStartTime.ToString("yyyy-MM-dd HH:mm:ss")
+                                serverUptime = "{0}d {1}h {2}m {3}s" -f $uptime.Days, $uptime.Hours, $uptime.Minutes, $uptime.Seconds
+                                totalRequests = $script:requestCount
+                                systemMemoryFree = [math]::Round($computerInfo.FreePhysicalMemory / 1MB, 2)
+                                totalProcesses = (Get-Process).Count
+                            }
+                            
+                            $responseBody = $statusInfo | ConvertTo-Json
+                        }
+                        catch {
+                            $response.StatusCode = 500
+                            $responseBody = "{`"error`": `"Failed to get server status`"}"
+                        }
+                        
                         $buffer = [System.Text.Encoding]::UTF8.GetBytes($responseBody)
                         $response.ContentLength64 = $buffer.Length
                         $response.OutputStream.Write($buffer, 0, $buffer.Length)
@@ -334,22 +384,37 @@ function Start-Server {
         }
     }
     catch {
-        Write-Host "Server error: $_" -ForegroundColor Red
+        Write-Error "Error occurred in server loop: $_"
     }
     finally {
-        $listener.Stop()
+        if ($listener -and $listener.IsListening) {
+            $listener.Stop()
+        }
         Write-Host "Server stopped"
     }
 }
 
 function Stop-Server {
-    param(
+    param (
         [Parameter(ValueFromPipeline = $true)]
-        $Listener
+        $Listener,
+        
+        [Parameter()]
+        [switch]$Force
     )
+    
+    # Signal shutdown
+    $script:shuttingDown = $true
+    
+    # Give time for current requests to complete, unless force is specified
+    if (-not $Force) {
+        Write-Host "Waiting for current requests to complete..."
+        Start-Sleep -Seconds 3
+    }
     
     if ($Listener) {
         $Listener.Stop()
+        $Listener.Close()
     }
     else {
         # Fallback if listener not specified
@@ -359,6 +424,7 @@ function Stop-Server {
                 Write-Host "Stopping server on port 2000"
                 $processIds = $ports | Select-Object -ExpandProperty OwningProcess -Unique
                 foreach ($pid in $processIds) {
+                    Write-Host "Stopping process $pid"
                     Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
                 }
             }
@@ -368,7 +434,10 @@ function Stop-Server {
         }
     }
     
-    Write-Host "Server stopped"
+    # Report server statistics
+    $uptime = (Get-Date) - $script:serverStartTime
+    Write-Host "Server stopped. Total uptime: $($uptime.ToString())"
+    Write-Host "Total requests served: $script:requestCount"
 }
 
 # Start the server

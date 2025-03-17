@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="flex items-center">
                         <span class="text-xs text-gray-400 mr-4">${memoryInMB} MB</span>
                         <button class="stop-btn px-2 py-1 bg-red-600 hover:bg-red-700 rounded text-xs" 
-                                data-pid="${process.Id}" data-name="${process.Name}">Stop</button>
+                                data-pid="${process.Id}" data-name="${process.Name}"></button>
                     </div>
                 `;
                 
