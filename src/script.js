@@ -6,7 +6,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const date = new Date();
     const hour = date.getHours();
 
-    // Fetch user name and set greeting
     async function fetchName() {
         try {
             const greeting = document.getElementById('greetings');
@@ -35,7 +34,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Handle process actions (add/stop)
     async function handleProcess(action) {
         try {
             const inputElement = document.getElementById(`${action}ProcessInput`);
@@ -61,14 +59,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             const result = await response.json();
             
-            // Refresh process list
             getProcesses();
         } catch (error) {
             console.error(`Error ${action}ing process:`, error);
         }
     }
 
-    // Get and display process list
     async function getProcesses() {
         try {
             if (!processesContainer) {
@@ -81,7 +77,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             processesContainer.innerHTML = '';
             
-            // Sort processes by name
             data.sort((a, b) => a.Name.localeCompare(b.Name));
             
             data.forEach((process) => {
@@ -104,7 +99,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 processesContainer.appendChild(li);
             });
             
-            // Add event listeners to stop buttons
             document.querySelectorAll('.stop-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     const pid = btn.getAttribute('data-pid');
@@ -138,7 +132,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Set up event listeners
     if (addProcessForm) {
         addProcessForm.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -153,7 +146,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Initialize
     await fetchName();
     await getProcesses();
 });
