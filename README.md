@@ -42,11 +42,6 @@ Lock-InDashboard helps users maintain focus by managing running processes on Win
 - **GET /api/processes** - List all running processes
 - **POST /api/stop** - Stop a process by ID or name
 - **POST /api/add** - Start a new process
-- **GET /api/status** - Get system and server status
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
