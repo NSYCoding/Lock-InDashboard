@@ -1,17 +1,12 @@
 # Lock-InDashboard
 
-A Windows productivity solution that combines a Tailwind CSS frontend with PowerShell automation to create a distraction-free learning environment while tracking user progress.
-
-## Overview
-
-Lock-InDashboard helps users maintain focus by managing running processes on Windows systems with a clean, intuitive interface. Perfect for educational institutions, focused work sessions, or anyone looking to improve productivity on Windows devices.
+A Windows solution that combines a Tailwind CSS frontend with PowerShell automation to create a ui interface for managing processes
 
 ## Features
 
 - **Process Management**: Start and stop Windows processes from a user-friendly dashboard
 - **System Monitoring**: View running processes with memory usage in real-time
 - **PowerShell Backend**: Robust server implementation with RESTful API endpoints
-- **Tailwind CSS Interface**: Clean, responsive UI with modern design principles
 
 ## Quick Start
 
