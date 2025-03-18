@@ -1,24 +1,15 @@
-# Process Management HTTP Server
-# Global variables
 $jsonFile = "./data.json"
 $staticFilesDir = "./src/"
 
-# Initialize tracking variables
 $script:serverStartTime = Get-Date
 $script:requestCount = 0
 $script:shuttingDown = $false
 
-# MIME type definitions for static file serving
 $mimeTypes = @{
     ".html" = "text/html"
     ".css"  = "text/css"
     ".js"   = "text/javascript"
     ".json" = "application/json" 
-    ".png"  = "image/png"
-    ".jpg"  = "image/jpeg"
-    ".gif"  = "image/gif"
-    ".svg"  = "image/svg+xml"
-    ".ico"  = "image/x-icon"
 }
 
 function Get-Json {
@@ -59,13 +50,10 @@ function Send-StaticFile {
         $Response
     )
     
-    # Determine the file path
     $filePath = if ($LocalPath -eq "/" -or [string]::IsNullOrEmpty($LocalPath)) {
-        # Default to index.html
         Join-Path -Path $staticFilesDir -ChildPath "index.html"
     }
     else {
-        # Remove leading slash if present
         $cleanPath = $LocalPath.TrimStart('/')
         Join-Path -Path $staticFilesDir -ChildPath $cleanPath
     }
@@ -86,7 +74,6 @@ function Send-StaticFile {
         $Response.ContentLength64 = $fileContent.Length
         $Response.OutputStream.Write($fileContent, 0, $fileContent.Length)
         
-        # Track request
         $script:requestCount++
         
         return $true
@@ -100,7 +87,6 @@ function Send-StaticFile {
         $Response.ContentLength64 = $errorBytes.Length
         $Response.OutputStream.Write($errorBytes, 0, $errorBytes.Length)
         
-        # Still track the request even though it's a 404
         $script:requestCount++
         
         return $false
@@ -108,18 +94,15 @@ function Send-StaticFile {
 }
 
 function Start-Server {
-    # Reset tracking variables
     $script:serverStartTime = Get-Date
     $script:requestCount = 0
     $script:shuttingDown = $false
     
-    # Create data file if needed
     if (-not (Test-Path -Path $jsonFile)) {
         Write-Host "Creating empty data file: $jsonFile"
         "[]" | Out-File -FilePath $jsonFile -Force
     }
     
-    # Create static files directory if needed
     if (-not (Test-Path -Path $staticFilesDir)) {
         Write-Host "Creating static files directory: $staticFilesDir"
         New-Item -ItemType Directory -Path $staticFilesDir -Force
@@ -132,7 +115,7 @@ function Start-Server {
     Write-Host "Open your browser at http://localhost:2000/"
 
     try {
-        while ($listener.IsListening) {
+        while ($listener.IsListening -and -not $script:shuttingDown) {
             $context = $listener.GetContext()
             $request = $context.Request
             $response = $context.Response
@@ -140,7 +123,6 @@ function Start-Server {
             $response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
             $response.Headers.Add("Access-Control-Allow-Headers", "Content-Type")
             
-            # Handle preflight requests
             if ($request.HttpMethod -eq "OPTIONS") {
                 $response.StatusCode = 200
                 $response.Close()
@@ -149,7 +131,6 @@ function Start-Server {
 
             $url = $request.Url
             
-            # Get request body if present
             $body = ""
             if ($request.HasEntityBody) {
                 $reader = New-Object System.IO.StreamReader($request.InputStream)
@@ -159,53 +140,20 @@ function Start-Server {
             
             Write-Host "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - $($request.HttpMethod) $($url.LocalPath)" -ForegroundColor Cyan
             
-            # Track the API request
             $script:requestCount++
 
-            # Handle based on path
             try {
                 switch -Regex ($url.LocalPath) {
                     "/api/name" {
                         $response.ContentType = "application/json"
                         try {
                             $fullUsername = (Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop).UserName
-                            # Extract just the username part after the domain\
                             $username = $fullUsername -replace '.*\\', ''
                         } catch {
                             $username = "Unknown User"
                             Write-Error "Failed to retrieve username: $_"
                         }
-                        # Use "name" instead of "username" to match client expectations
                         $responseBody = "{`"name`": `"$username`"}"
-                        $buffer = [System.Text.Encoding]::UTF8.GetBytes($responseBody)
-                        $response.ContentLength64 = $buffer.Length
-                        $response.OutputStream.Write($buffer, 0, $buffer.Length)
-                        break
-                    }
-                    "/api/status" {
-                        $response.ContentType = "application/json"
-                        try {
-                            # Get basic system info
-                            $computerInfo = Get-CimInstance -ClassName Win32_OperatingSystem
-                            $uptime = (Get-Date) - $computerInfo.LastBootUpTime
-                            
-                            # Format server status information
-                            $statusInfo = @{
-                                serverRunning = $true
-                                serverStartTime = $script:serverStartTime.ToString("yyyy-MM-dd HH:mm:ss")
-                                serverUptime = "{0}d {1}h {2}m {3}s" -f $uptime.Days, $uptime.Hours, $uptime.Minutes, $uptime.Seconds
-                                totalRequests = $script:requestCount
-                                systemMemoryFree = [math]::Round($computerInfo.FreePhysicalMemory / 1MB, 2)
-                                totalProcesses = (Get-Process).Count
-                            }
-                            
-                            $responseBody = $statusInfo | ConvertTo-Json
-                        }
-                        catch {
-                            $response.StatusCode = 500
-                            $responseBody = "{`"error`": `"Failed to get server status`"}"
-                        }
-                        
                         $buffer = [System.Text.Encoding]::UTF8.GetBytes($responseBody)
                         $response.ContentLength64 = $buffer.Length
                         $response.OutputStream.Write($buffer, 0, $buffer.Length)
@@ -233,9 +181,7 @@ function Start-Server {
                         try {
                             $processData = $body | ConvertFrom-Json
                             
-                            # Check if we have a process ID or name
                             if ($processData.Id) {
-                                # Stop by ID
                                 try {
                                     $processId = [int]$processData.Id
                                     $process = Get-Process -Id $processId -ErrorAction Stop
@@ -249,15 +195,12 @@ function Start-Server {
                                 }
                             }
                             elseif ($processData.Name) {
-                                # Stop by Name
                                 $processName = $processData.Name
                                 try {
-                                    # Check if the process exists first
                                     $processes = Get-Process -Name $processName -ErrorAction Stop
                                     $count = $processes.Count
                                     
                                     if ($count -gt 0) {
-                                        # Kill all matching processes
                                         $processes | ForEach-Object { $_.Kill() }
                                         Write-Host "Process $processName ($count instances) killed successfully" -ForegroundColor Green
                                         $responseBody = "{`"success`": true, `"message`": `"$count instances of $processName stopped`"}"
@@ -289,37 +232,30 @@ function Start-Server {
                     "/api/add" {
                         $response.ContentType = "application/json"
                         try {
-                            # Parse the request body into $newData
                             $newData = $body | ConvertFrom-Json
 
-                            # Create new process object
                             $newProcess = New-Object PSObject
                             Add-Member -InputObject $newProcess -MemberType NoteProperty -Name "Name" -Value $newData.Name
                             Add-Member -InputObject $newProcess -MemberType NoteProperty -Name "Path" -Value $newData.Path
                             Add-Member -InputObject $newProcess -MemberType NoteProperty -Name "Arguments" -Value $newData.Arguments
                             Add-Member -InputObject $newProcess -MemberType NoteProperty -Name "Id" -Value $null
 
-                            # Validate required fields
                             if (-not $newProcess.Name) {
                                 throw "Process name is required"
                             }
 
-                            # Try to resolve the executable path if not provided
                             if (-not $newProcess.Path) {
                                 try {
-                                    # Try to find the executable in PATH
                                     $processPath = (Get-Command $newProcess.Name -ErrorAction Stop).Path
                                     $newProcess.Path = $processPath
                                 }
                                 catch {
-                                    # Use the name as the path if not found
                                     $newProcess.Path = $newProcess.Name
                                 }
                             }
 
                             Write-Host "Attempting to start process: $($newProcess.Path)" -ForegroundColor Cyan
 
-                            # Start the added process
                             $processArgs = @{
                                 FilePath    = $newProcess.Path
                                 PassThru    = $true
@@ -330,18 +266,14 @@ function Start-Server {
                                 $processArgs.ArgumentList = $newProcess.Arguments
                             }
 
-                            # Try to start the process
                             $process = Start-Process @processArgs
 
                             if ($process) {
-                                # Update with actual process ID
                                 $newProcess.Id = $process.Id
             
-                                # Add the new data to the existing JSON
                                 $jsonData = Get-Json | ConvertFrom-Json
                                 $jsonData += $newProcess
             
-                                # Save the updated data
                                 Set-Json -Json $jsonData
             
                                 $responseBody = "{`"success`": true, `"message`": `"Process $($newProcess.Name) started with ID $($process.Id)`"}"
@@ -362,10 +294,9 @@ function Start-Server {
                         $response.ContentLength64 = $buffer.Length
                         $response.OutputStream.Write($buffer, 0, $buffer.Length)
                         break
-                    }
-                    default {
-                        # Serve static files
+                    } default {
                         Send-StaticFile -LocalPath $url.LocalPath -Response $response
+                        break
                     }
                 }
             }
@@ -403,10 +334,8 @@ function Stop-Server {
         [switch]$Force
     )
     
-    # Signal shutdown
     $script:shuttingDown = $true
     
-    # Give time for current requests to complete, unless force is specified
     if (-not $Force) {
         Write-Host "Waiting for current requests to complete..."
         Start-Sleep -Seconds 3
@@ -417,7 +346,6 @@ function Stop-Server {
         $Listener.Close()
     }
     else {
-        # Fallback if listener not specified
         try {
             $ports = Get-NetTCPConnection -LocalPort 2000 -ErrorAction SilentlyContinue
             if ($ports) {
@@ -434,12 +362,24 @@ function Stop-Server {
         }
     }
     
-    # Report server statistics
     $uptime = (Get-Date) - $script:serverStartTime
     Write-Host "Server stopped. Total uptime: $($uptime.ToString())"
     Write-Host "Total requests served: $script:requestCount"
 }
 
-# Start the server
 Write-Host "Starting server..."
-Start-Server
+Write-Host "Press Ctrl+C to stop the server"
+
+try {
+    $null = Register-ObjectEvent -InputObject ([Console]) -EventName CancelKeyPress -Action {
+        Write-Host "`nStopping server due to Ctrl+C..." -ForegroundColor Yellow
+        $script:shuttingDown = $true
+        $event.MessageData.Set()
+        $event.Cancel = $true
+    } -MessageData ([Threading.ManualResetEvent]::new($false))
+    
+    Start-Server
+}
+finally {
+    Get-EventSubscriber | Where-Object SourceObject -eq ([Console]) | Unregister-Event
+}
